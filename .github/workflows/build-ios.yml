@@ -41,14 +41,14 @@ jobs:
       - name: Prebuild iOS project
         run: npx expo prebuild --platform ios --clean
 
-      # ---- Disable the bundling script phase that fails ----
-      - name: Disable JS bundle script phase in Xcode project
+      # ---- REMOVE the problematic script build phase completely ----
+      - name: Remove JS bundle script phase from Xcode project
         run: |
           PBXPROJ="ios/EchoApp.xcodeproj/project.pbxproj"
           if [ -f "$PBXPROJ" ]; then
-            # Comment out the "Bundle React Native code and images" script line
-            sed -i '' 's/00DD1BFF1BD5951E006B06BC \/\* Bundle React Native code and images \*\//DISABLED_00DD1BFF1BD5951E006B06BC/' "$PBXPROJ"
-            echo "Disabled bundle script phase"
+            # Delete the entire build phase entry that references "Bundle React Native code and images"
+            sed -i '' '/Bundle React Native code and images/d' "$PBXPROJ"
+            echo "Removed bundling script phase"
           fi
 
       - name: Build unsigned IPA
