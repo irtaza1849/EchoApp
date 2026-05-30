@@ -18,7 +18,7 @@ jobs:
         with:
           node-version: 18
 
-      - name: Remove deprecated expo-barcode-scanner from package.json and app.json
+      - name: Remove deprecated expo-barcode-scanner
         run: |
           if grep -q "expo-barcode-scanner" package.json; then
             npm uninstall expo-barcode-scanner
@@ -31,25 +31,26 @@ jobs:
               if (config.expo && config.expo.plugins) {
                 config.expo.plugins = config.expo.plugins.filter(p => !p.includes('expo-barcode-scanner'));
                 fs.writeFileSync(path, JSON.stringify(config, null, 2));
-                console.log('Removed expo-barcode-scanner from app.json plugins');
               }
             }
           "
 
-      - name: Install dependencies
-        run: npm install
+      - name: Install dependencies (including missing CLI)
+        run: |
+          npm install
+          npm install --save-dev @react-native-community/cli
 
       - name: Prebuild iOS project
         run: npx expo prebuild --platform ios --clean
 
-      # ---- Use Expo's built-in bundler instead of react-native CLI ----
-      - name: Bundle JavaScript with Expo
+      - name: Bundle JavaScript
         run: |
-          npx expo export:embed \
+          npx react-native bundle \
             --platform ios \
+            --dev false \
             --entry-file index.js \
             --bundle-output ios/main.jsbundle \
-            --assets-dest ios/assets
+            --assets-dest ios
 
       - name: Build unsigned IPA
         run: |
