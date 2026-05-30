@@ -42,15 +42,14 @@ jobs:
       - name: Prebuild iOS project
         run: npx expo prebuild --platform ios --clean
 
-      # ---- NEW: Pre‑bundle the React Native JS ---- 
-      - name: Bundle React Native code
+      # ---- Use Expo's built-in bundler instead of react-native CLI ----
+      - name: Bundle JavaScript with Expo
         run: |
-          npx react-native bundle \
+          npx expo export:embed \
             --platform ios \
-            --dev false \
             --entry-file index.js \
-            --bundle-output ios/bundle/main.jsbundle \
-            --assets-dest ios/bundle
+            --bundle-output ios/main.jsbundle \
+            --assets-dest ios/assets
 
       - name: Build unsigned IPA
         run: |
