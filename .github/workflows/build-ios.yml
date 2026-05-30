@@ -23,7 +23,6 @@ jobs:
           if grep -q "expo-barcode-scanner" package.json; then
             npm uninstall expo-barcode-scanner
           fi
-          # Remove the plugin entry from app.json (if exists)
           node -e "
             const fs = require('fs');
             const path = './app.json';
@@ -42,6 +41,16 @@ jobs:
 
       - name: Prebuild iOS project
         run: npx expo prebuild --platform ios --clean
+
+      # ---- NEW: Pre‑bundle the React Native JS ---- 
+      - name: Bundle React Native code
+        run: |
+          npx react-native bundle \
+            --platform ios \
+            --dev false \
+            --entry-file index.js \
+            --bundle-output ios/bundle/main.jsbundle \
+            --assets-dest ios/bundle
 
       - name: Build unsigned IPA
         run: |
