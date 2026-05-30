@@ -1,0 +1,15 @@
+{
+  "build": {
+    "development": {
+      "ios": {
+        "credentialsSource": "local"
+      }
+    },
+    "unsigned": {
+      "ios": {
+        "distribution": "development",
+        "credentialsSource": "local"
+      }
+    }
+  }
+}
