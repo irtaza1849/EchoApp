@@ -1,11 +1,11 @@
 // screens/WebRTCClient.js
 import { RTCPeerConnection, RTCSessionDescription, RTCIceCandidate } from 'react-native-webrtc';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 class WebRTCClient {
   constructor() {
     this.pc = null;
-    this.remoteAudioStream = null;
+    this.onRemoteStream = null;
+    this.onSignal = null;
   }
 
   async createPeerConnection() {
@@ -13,36 +13,37 @@ class WebRTCClient {
       iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
     });
 
-    // When remote audio track arrives
     this.pc.onaddstream = (event) => {
-      this.remoteAudioStream = event.stream;
-      // The stream can be passed to a <RTCView> for playback (or we handle audio directly)
       if (this.onRemoteStream) {
         this.onRemoteStream(event.stream);
       }
     };
 
     this.pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        // Send candidate to Omni via WebSocket
-        this.sendSignal('candidate:' + event.candidate.candidate);
+      if (event.candidate && this.onSignal) {
+        this.onSignal('candidate:' + event.candidate.candidate);
       }
     };
+
+    // Also handle ontrack for modern browsers (but onaddstream is fine for this lib)
   }
 
   async createOffer() {
     const offer = await this.pc.createOffer({ offerToReceiveAudio: true });
     await this.pc.setLocalDescription(offer);
-    this.sendSignal('offer:' + offer.sdp);
+    if (this.onSignal) {
+      this.onSignal('offer:' + offer.sdp);
+    }
   }
 
   async handleSignal(message) {
+    if (!this.pc) return;
     if (message.startsWith('offer:')) {
       const sdp = message.substring(6);
       await this.pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp }));
       const answer = await this.pc.createAnswer();
       await this.pc.setLocalDescription(answer);
-      this.sendSignal('answer:' + answer.sdp);
+      if (this.onSignal) this.onSignal('answer:' + answer.sdp);
     } else if (message.startsWith('answer:')) {
       const sdp = message.substring(7);
       await this.pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp }));
@@ -52,14 +53,11 @@ class WebRTCClient {
     }
   }
 
-  // This will be set by the CallScreen to forward messages over the existing WebSocket
-  sendSignal = (msg) => {
-    if (this.onSignal) this.onSignal(msg);
-  };
-
   close() {
-    if (this.pc) this.pc.close();
-    this.pc = null;
+    if (this.pc) {
+      this.pc.close();
+      this.pc = null;
+    }
   }
 }
 

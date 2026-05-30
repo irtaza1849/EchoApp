@@ -8,7 +8,7 @@ import { useKeepAwake } from 'expo-keep-awake';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { addCallLog } from './RecentsScreen';
 import WebRTCClient from './WebRTCClient';
-import { RTCView } from 'react-native-webrtc';
+import { RTCView, mediaDevices } from 'react-native-webrtc';
 
 export default function CallScreen({ route, navigation }) {
   const { number, timestamp, name } = route.params || {};
@@ -19,11 +19,11 @@ export default function CallScreen({ route, navigation }) {
   const [duration, setDuration] = useState(0);
   const [remoteStream, setRemoteStream] = useState(null);
   const ringtoneRef = useRef(null);
-  const audioSocketRef = useRef(null);
-  const webrtcRef = useRef(null);
   const signalSocketRef = useRef(null);
+  const webrtcRef = useRef(null);
   const mountedRef = useRef(true);
   const timerRef = useRef(null);
+  const localStreamRef = useRef(null);
 
   useKeepAwake();
 
@@ -57,10 +57,12 @@ export default function CallScreen({ route, navigation }) {
         ringtoneRef.current.unloadAsync().catch(() => {});
       }
       Vibration.cancel();
-      if (audioSocketRef.current) audioSocketRef.current.close();
       if (signalSocketRef.current) signalSocketRef.current.close();
       if (timerRef.current) clearInterval(timerRef.current);
       if (webrtcRef.current) webrtcRef.current.close();
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach(track => track.stop());
+      }
     };
   }, []);
 
@@ -97,19 +99,24 @@ export default function CallScreen({ route, navigation }) {
     } catch (e) {}
   };
 
-  const startCallSignalling = async () => {
+  const startWebRTC = async () => {
     try {
       const ip = await AsyncStorage.getItem('omniIp');
       const port = await AsyncStorage.getItem('omniPort');
       if (!ip || !port) return;
 
-      // Open a persistent signalling WebSocket
+      // Open signalling WebSocket
       const ws = new WebSocket(`ws://${ip}:${port}`);
       signalSocketRef.current = ws;
 
       const webrtc = new WebRTCClient();
       webrtcRef.current = webrtc;
       await webrtc.createPeerConnection();
+
+      // Get local audio stream
+      const localStream = await mediaDevices.getUserMedia({ audio: true, video: false });
+      localStreamRef.current = localStream;
+      localStream.getTracks().forEach(track => webrtc.pc.addTrack(track, localStream));
 
       webrtc.onRemoteStream = (stream) => {
         setRemoteStream(stream);
@@ -156,7 +163,7 @@ export default function CallScreen({ route, navigation }) {
     }
     Vibration.cancel();
     sendCommand('answer_call');
-    startCallSignalling();
+    startWebRTC();
     addCallLog(number, 'incoming');
   };
 
@@ -174,13 +181,29 @@ export default function CallScreen({ route, navigation }) {
   const handleEndCall = () => {
     if (signalSocketRef.current) signalSocketRef.current.close();
     if (webrtcRef.current) webrtcRef.current.close();
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => track.stop());
+    }
     if (timerRef.current) clearInterval(timerRef.current);
     sendCommand('reject_call');
     safeGoBack();
   };
 
-  const toggleMute = () => setIsMuted(!isMuted);
-  const toggleSpeaker = () => setIsSpeaker(!isSpeaker);
+  const toggleMute = () => {
+    setIsMuted(!isMuted);
+    if (localStreamRef.current) {
+      localStreamRef.current.getAudioTracks().forEach(track => {
+        track.enabled = isMuted; // toggle
+      });
+    }
+  };
+
+  const toggleSpeaker = () => {
+    setIsSpeaker(!isSpeaker);
+    // On iOS, speaker is controlled by Audio category; on Android, we can't do much in managed workflow.
+    // Placeholder.
+  };
+
   const formatDuration = (sec) => {
     const mins = Math.floor(sec / 60);
     const secs = sec % 60;

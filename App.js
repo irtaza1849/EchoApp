@@ -8,6 +8,8 @@ import PairingScreen from './screens/PairingScreen';
 import PaymentScreen from './screens/PaymentScreen';
 import DialerTabs from './screens/DialerTabs';
 import CallScreen from './screens/CallScreen';
+import ComposeScreen from './screens/ComposeScreen';
+import ConversationScreen from './screens/ConversationScreen';
 
 const Stack = createStackNavigator();
 
@@ -25,6 +27,8 @@ export default function App() {
           component={CallScreen}
           options={{ presentation: 'modal', animationTypeForReplace: 'push' }}
         />
+        <Stack.Screen name="Compose" component={ComposeScreen} />
+        <Stack.Screen name="Conversation" component={ConversationScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
