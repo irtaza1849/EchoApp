@@ -18,11 +18,24 @@ jobs:
         with:
           node-version: 18
 
-      - name: Remove deprecated expo-barcode-scanner
+      - name: Remove deprecated expo-barcode-scanner from package.json and app.json
         run: |
           if grep -q "expo-barcode-scanner" package.json; then
             npm uninstall expo-barcode-scanner
           fi
+          # Remove the plugin entry from app.json (if exists)
+          node -e "
+            const fs = require('fs');
+            const path = './app.json';
+            if (fs.existsSync(path)) {
+              const config = JSON.parse(fs.readFileSync(path, 'utf8'));
+              if (config.expo && config.expo.plugins) {
+                config.expo.plugins = config.expo.plugins.filter(p => !p.includes('expo-barcode-scanner'));
+                fs.writeFileSync(path, JSON.stringify(config, null, 2));
+                console.log('Removed expo-barcode-scanner from app.json plugins');
+              }
+            }
+          "
 
       - name: Install dependencies
         run: npm install
@@ -44,7 +57,6 @@ jobs:
             PROVISIONING_PROFILE_SPECIFIER="" \
             DEVELOPMENT_TEAM="" \
             archive
-          # Create exportOptions.plist for unsigned IPA
           cat > exportOptions.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -67,7 +79,6 @@ jobs:
             -exportPath ./build \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO
-          # Create IPA from .app
           mkdir -p Payload
           mv ./build/EchoApp.app ./Payload/
           zip -r EchoApp.ipa Payload
