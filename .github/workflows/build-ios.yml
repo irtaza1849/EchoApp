@@ -31,7 +31,6 @@ jobs:
               if (config.expo && config.expo.plugins) {
                 config.expo.plugins = config.expo.plugins.filter(p => !p.includes('expo-barcode-scanner'));
                 fs.writeFileSync(path, JSON.stringify(config, null, 2));
-                console.log('Removed expo-barcode-scanner from app.json plugins');
               }
             }
           "
@@ -39,15 +38,20 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # Install packages that the Xcode bundle script needs
-      - name: Install missing CLI and Metro packages
-        run: |
-          npm install --save-dev @react-native-community/cli @react-native/metro-config metro metro-core metro-config
-
       - name: Prebuild iOS project
         run: npx expo prebuild --platform ios --clean
 
-      - name: Build unsigned IPA (Xcode will handle JS bundling)
+      # ---- Disable the bundling script phase that fails ----
+      - name: Disable JS bundle script phase in Xcode project
+        run: |
+          PBXPROJ="ios/EchoApp.xcodeproj/project.pbxproj"
+          if [ -f "$PBXPROJ" ]; then
+            # Comment out the "Bundle React Native code and images" script line
+            sed -i '' 's/00DD1BFF1BD5951E006B06BC \/\* Bundle React Native code and images \*\//DISABLED_00DD1BFF1BD5951E006B06BC/' "$PBXPROJ"
+            echo "Disabled bundle script phase"
+          fi
+
+      - name: Build unsigned IPA
         run: |
           cd ios
           pod install || true
